@@ -248,6 +248,7 @@ static void modem_handshake (void * context_, TA_RESULT_CODE result_code_, const
             LogError("Failed to negotiate handshake before exhausting maximum allowed time-outs!");
             /* Codes_SRS_ATRPC_27_065: [ During auto-baud negotiation, if 50 or more time-outs occur, then modem_handshake() shall call the (void)on_open_complete(void * context, ta_result_code result_code, char * response) callback provided to atrpc_open(), using the on_open_complete_context argument provided to atrpc_open() as the context parameter, ERROR_ATRPC as the result_code parameter, and NULL as the response parameter. ] */
             atrpc->handshake_attempt = 0;
+        	clear_current_request(atrpc);
             atrpc->on_open_complete(atrpc->on_open_complete_context, ERROR_ATRPC);
         }
         else
@@ -494,7 +495,7 @@ static void modem_on_io_open_complete (void * context_, IO_OPEN_RESULT open_resu
             atrpc->modem_status = MODEM_IO_OPEN;
             /* Codes_SRS_ATRPC_27_071: [ If the open_result parameter is OPEN_OK, then on_io_open_complete() shall initiate the auto-bauding procedure by calling (void)atrpc_attention(void * context, const char * const command_string, const size_t command_string_length const size_t timeout_ms, TA_RESPONSE const ta_response, const void * const ta_response_context) using the incoming context parameter as the handle parameter, NULL as the command_string parameter, 0 as the command_string_length parameter, 100 as the timeout_ms parameter, modem_handshake as the ta_response parameter, and ta_response_context as the context parameter. ] */
             /* Codes_SRS_ATRPC_27_072: [ If atrpc_attention returns a non-zero value, then on_io_open_complete() shall call the on_open_complete callback passed to atrpc_open() using the on_open_complete_context parameter passed to atrpc_open() as the context parameter, ERROR_ATRPC as the result_code parameter, and NULL as the response parameter. ] */
-            modem_handshake(context_, CONNECT_3GPP, NULL, 0);
+            modem_handshake(context_, ERROR_ATRPC, NULL, 0);
         }
     }
     return;
@@ -654,14 +655,11 @@ int atrpc_close (ATRPC_HANDLE handle_)
     else
     {
         /* Codes_SRS_ATRPC_27_018: [ atrpc_close() shall block until the on_io_close_complete callback passed to xio_close() completes. ] */
-        //TODO:assert(MODEM_IO_CLOSED == handle_->modem_status);
-        for (;MODEM_IO_CLOSED != handle_->modem_status;)
-        {
-            xio_dowork(handle_->modem_io);
-        }
+        assert(MODEM_IO_CLOSED == handle_->modem_status);
 
         if (ATRPC_NEGOTIATING_AUTOBAUD == handle_->status || ATRPC_HANDSHAKING == handle_->status)
         {
+        	clear_current_request(handle_);
             /* Codes_SRS_ATRPC_27_015: [ If atrpc_open() has been called on the handle and the on_open_complete callback has not been called, atrpc_close() shall call the (void)on_open_complete(void * context, ta_result_code result_code, char * response) callback provided to atrpc_open(), using the on_open_complete_context argument provided to atrpc_open() as the context parameter, and ERROR_ATRPC as the result_code parameter. ] */
             handle_->on_open_complete(handle_->on_open_complete_context, ERROR_ATRPC);
         }
